@@ -61,18 +61,25 @@ router.get("/", async (req, res) => {
         }
 
         // Pagination
-        const skip = (Number(page) - 1) * Number(limit);
+        const pageNumber = Number(page);
+        const limitNumber = Number(limit);
+        const skip = (pageNumber - 1) * limitNumber;
 
-        const products = await Product.find(filter)
-            .skip(skip)
-            .limit(Number(limit));
+        // Run both queries at the same time
+        const [products, totalProducts] = await Promise.all([
+            Product.find(filter)
+                .select("name description price category image stock")
+                .skip(skip)
+                .limit(limitNumber)
+                .lean(),
 
-        const totalProducts = await Product.countDocuments(filter);
+            Product.countDocuments(filter)
+        ]);
 
         res.status(200).json({
             products,
-            currentPage: Number(page),
-            totalPages: Math.ceil(totalProducts / Number(limit)),
+            currentPage: pageNumber,
+            totalPages: Math.ceil(totalProducts / limitNumber),
             totalProducts
         });
 
@@ -82,7 +89,6 @@ router.get("/", async (req, res) => {
         });
     }
 });
-
 // GET SINGLE PRODUCT
 router.get("/:id", async (req, res) => {
     try {

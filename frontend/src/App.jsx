@@ -138,36 +138,48 @@ function Navbar({ cart, user, logout }) {
 // ==========================================
 // PRODUCTS PAGE
 // ==========================================
-
 function Products() {
   const [products, setProducts] = useState([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
-
-  const getProducts = async () => {
-    try {
-
-      const response = await axios.get(
-        "http://localhost:5000/api/products",
-        {
-          params: {
-            search,
-            category
-          }
-        }
-      );
-
-      setProducts(response.data.products);
-
-    } catch (error) {
-
-      console.log("Error:", error);
-
-    }
-  };
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    getProducts();
+    const controller = new AbortController();
+
+    const timer = setTimeout(async () => {
+      try {
+        setLoading(true);
+
+        const response = await axios.get(
+          "http://localhost:5000/api/products",
+          {
+            params: {
+              search,
+              category
+            },
+            signal: controller.signal
+          }
+        );
+
+        setProducts(response.data.products);
+
+      } catch (error) {
+        // Ignore cancelled requests
+        if (error.name !== "CanceledError") {
+          console.log("Error:", error);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }, 500);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [search, category]);
 
   return (
@@ -189,6 +201,7 @@ function Products() {
 
         </div>
 
+
         {/* SEARCH + CATEGORY */}
 
         <div className="row g-3 mb-5">
@@ -206,23 +219,20 @@ function Products() {
                 className="form-control"
                 placeholder="Search products..."
                 value={search}
-                onChange={(e) =>
-                  setSearch(e.target.value)
-                }
+                onChange={(e) => setSearch(e.target.value)}
               />
 
             </div>
 
           </div>
 
+
           <div className="col-md-4">
 
             <select
               className="form-select"
               value={category}
-              onChange={(e) =>
-                setCategory(e.target.value)
-              }
+              onChange={(e) => setCategory(e.target.value)}
             >
 
               <option value="">
@@ -263,40 +273,63 @@ function Products() {
 
         </div>
 
-        {/* PRODUCT GRID */}
 
-        <div className="row g-4">
+        {/* LOADING */}
 
-          {products.length > 0 ? (
+        {loading ? (
 
-            products.map((product) => (
+          <div className="text-center py-5">
 
-              <div
-                className="col-12 col-sm-6 col-lg-4 col-xl-3"
-                key={product._id}
-              >
+            <div
+              className="spinner-border"
+              role="status"
+            ></div>
 
-                <ProductCard
-                  product={product}
-                />
+            <p className="mt-3 text-muted">
+              Loading products...
+            </p>
+
+          </div>
+
+        ) : (
+
+
+          /* PRODUCT GRID */
+
+          <div className="row g-4">
+
+            {products.length > 0 ? (
+
+              products.map((product) => (
+
+                <div
+                  className="col-12 col-sm-6 col-lg-4 col-xl-3"
+                  key={product._id}
+                >
+
+                  <ProductCard
+                    product={product}
+                  />
+
+                </div>
+
+              ))
+
+            ) : (
+
+              <div className="col-12 text-center py-5">
+
+                <h4>
+                  No products found 😕
+                </h4>
 
               </div>
 
-            ))
+            )}
 
-          ) : (
+          </div>
 
-            <div className="col-12 text-center py-5">
-
-              <h4>
-                No products found 😕
-              </h4>
-
-            </div>
-
-          )}
-
-        </div>
+        )}
 
       </div>
 
@@ -320,8 +353,11 @@ function ProductCard({ product }) {
 
         <img
           src={product.image}
-          className="card-img-top"
+          className="card-img-top img-fluid"
           alt={product.name}
+            loading="lazy"
+  decoding="async"
+
           onError={(e) => {
             e.target.src =
               "https://placehold.co/600x400?text=No+Image";
